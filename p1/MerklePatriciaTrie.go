@@ -62,47 +62,20 @@ func (mpt MerklePatriciaTrie) get_helper(current_node Node, new_path []uint8) st
 	}
 }
 
-//func (mpt *MerklePatriciaTrie) get_helper(path []uint8, node Node) string{
-
-//}
-
 func (mpt *MerklePatriciaTrie) Insert(key string, new_value string) {
 	var strToAscii []uint8
 	var decoded []uint8
-	//var encoded []uint8
-
 	strToAscii = str_to_ascii(key)
 	decoded = compact_decode_wt_prefix(strToAscii)
-	//It's a leaf, so insert 16 at the end -- doing it inside insert_helper
-	//decoded = append(decoded, 16)
-	//encoded = compact_encode(decoded)
-
 	root_node := mpt.insert_helper(decoded, new_value, mpt.db[mpt.root])
-	fmt.Println("root hash: ", root_node.hash_node())
-	fmt.Println("root encoded: ", root_node.flag_value.encoded_prefix)
 	mpt.root = root_node.hash_node()
 	if mpt.db == nil {
 		mpt.db = make(map[string]Node)
 	}
 	mpt.db[mpt.root] = root_node
-
-	fmt.Println("root: ", mpt.root)
-	for key, value := range mpt.db {
-		fmt.Println("key: ", key, "value: ", value)
-	}
-	//fmt.Println("db: ",mpt.db)
-	////case 1: empty db, create leaf
-	//if(mpt.root == "" || len(mpt.db) == 0){
-	//	strToAscii = str_to_ascii(key)
-	//	decoded = compact_decode_wt_prefix(strToAscii)
-	//	//It's a leaf, so insert 16 at the end
-	//	decoded = append(decoded, 16)
-	//	encoded = compact_encode(decoded)
-	//	node :=  Node{2, [17] string{}, Flag_value{encoded, new_value }}
-	//	mpt.root = node.hash_node()
-	//	mpt.db = make(map[string]Node)
-	//	mpt.db[mpt.root] = node
-	//	fmt.Println(mpt.db)
+	//fmt.Println("root: ", mpt.root)
+	//for key, value := range mpt.db {
+	//	fmt.Println("key: ", key, "value: ", value)
 	//}
 }
 
@@ -140,22 +113,9 @@ func (mpt *MerklePatriciaTrie) insert_helper(path []uint8, new_value string, cur
 			current_node.branch_value[16] = new_value
 		} else {
 			fmt.Println("ELSE IN BRANCH!")
-			fmt.Println("GOT IN...")
 			n := mpt.insert_helper(path[1:], new_value, mpt.db[current_node.branch_value[path[0]]])
 			current_node.branch_value[path[0]] = n.hash_node()
-			fmt.Println("finished recursing branch, hashnode gotten: ", n.hash_node())
-			fmt.Println("finished recursing branch, node gotten: ", n)
-			return current_node //HINT.TEST:
-			//fmt.Println("BRANCH NODE node branch val : ", current_node)
-			//fmt.Println("BRANCH VAL val : ", current_node.branch_value[path[0]])
-			//if current_node.branch_value[path[0]] != "" {
-			//	fmt.Println("GOT IN...")
-			//	n := mpt.insert_helper(path[1:], new_value, mpt.db[current_node.branch_value[path[0]]])
-			//	current_node.branch_value[path[0]] = n.hash_node()
-			//	fmt.Println("finished recursing branch, hashnode gotten: ", n.hash_node())
-			//	fmt.Println("finished recursing branch, node gotten: ", n)
-			//	return current_node //HINT.TEST:
-			//}
+			return current_node
 		}
 	} else if current_node.node_type == 2 {
 		existing_node_path := compact_decode(current_node.flag_value.encoded_prefix)
@@ -212,18 +172,27 @@ func (mpt *MerklePatriciaTrie) insert_helper(path []uint8, new_value string, cur
 				fmt.Println("is extension")
 				new_node = mpt.insert_helper(path[index:], new_value, mpt.db[current_node.flag_value.value])
 				fmt.Println("NEW NODE:", new_node)
-				//current_node = new_node
 				current_node.flag_value.value = new_node.hash_node()
 				fmt.Println("CurrentNode: ", current_node)
 				fmt.Println("Current Node hash:", current_node.hash_node())
+
+				//HINT: Leaving this block for future optimization. Consider how to replicate same solutions for extension with partial match done in next IF statement below
+				//ext_node2 := Node{2, [17]string{}, Flag_value{compact_encode(path[index + 1:]), new_value}}
+				//branch_node := Node{1, [17]string{""}, Flag_value{}}
+				//branch_node.branch_value[16] = current_node.flag_value.value
+				//branch_node.branch_value[path[index]] = ext_node2.hash_node()
+				//ext_node1 := Node{2, [17]string{}, Flag_value{compact_encode(path[:index]), branch_node.hash_node()}}
+				//delete(mpt.db, current_node.hash_node())
+				//mpt.db[ext_node2.hash_node()] = ext_node2
+				//mpt.db[branch_node.hash_node()] = branch_node
+				//mpt.db[ext_node1.hash_node()] = ext_node1
+				//current_node = ext_node1
 				//return current_node
 			}
 			fmt.Println("Index: ", index)
 			branch_node.branch_value[path[index]] = new_node.hash_node()
 			mpt.db[new_node.hash_node()] = new_node
 			mpt.db[branch_node.hash_node()] = branch_node
-			//sreturn current_node
-			//mpt.db[current_node.hash_node()] = current_node
 		} else if index < len(existing_node_path) && index == len(path) {
 			fmt.Println("check 2")
 			current_node_value := current_node.flag_value.value
@@ -236,15 +205,21 @@ func (mpt *MerklePatriciaTrie) insert_helper(path []uint8, new_value string, cur
 			if compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 1 || compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 0 {
 				//if extension node
 				fmt.Println("......inside extension.....")
-				var nextNode = mpt.insert_helper(existing_node_path[index:], new_value, mpt.db[current_node.flag_value.value])
-				current_node.flag_value.value = nextNode.hash_node()
-				//new_leaf_flag = Flag_value{encoded_prefix:compact_encode(oldDecoded_nibble[i+1:]), value:current_node_value}
+				ext_node2 := Node{2, [17]string{}, Flag_value{compact_encode(existing_node_path[index+1:]), current_node_value}}
+				branch_node := Node{1, [17]string{""}, Flag_value{}}
+				branch_node.branch_value[16] = new_value
+				branch_node.branch_value[existing_node_path[index]] = ext_node2.hash_node()
+				ext_node1 := Node{2, [17]string{}, Flag_value{compact_encode(existing_node_path[:index]), branch_node.hash_node()}}
+				delete(mpt.db, current_node.hash_node())
+				mpt.db[ext_node2.hash_node()] = ext_node2
+				mpt.db[branch_node.hash_node()] = branch_node
+				mpt.db[ext_node1.hash_node()] = ext_node1
+				current_node = ext_node1
+				return current_node
 			} else {
 				//if leaf
 				fmt.Println("......inside LEAF.....", len(path))
 				if len(path) == 0 {
-					//fmt.Println(new_node)
-					//branch_node.branch_value[oldDecoded_nibble[i]] = new_node.hash_node()
 					branch_node.branch_value[16] = new_value //put current value in 16th index
 					mpt.db[new_node.hash_node()] = new_node
 					mpt.db[branch_node.hash_node()] = branch_node
@@ -256,17 +231,12 @@ func (mpt *MerklePatriciaTrie) insert_helper(path []uint8, new_value string, cur
 					current_node.flag_value.value = branch_node.hash_node()
 					mpt.db[current_node.hash_node()] = current_node
 				}
-				//fmt.Println(“current node len”, len(currentNode.flag_value.encoded_prefix))
 				mpt.db[new_node.hash_node()] = new_node //update db
 				mpt.db[branch_node.hash_node()] = branch_node
 				return branch_node
 			}
-			//return current_node
-			//mpt.db[current_node.hash_node()] = current_node
-			//mpt.db[current_node.hash_node()] = current_node
 		} else if index == 0 {
 			fmt.Println("check 3")
-			//new_node := Node{2, [17] string{}, Flag_value{compact_encode(append(path[index + 1:], 16)), new_value }} // make leaf of remaining path that would not be stored in extension node
 			var new_node Node
 			branch_node := Node{1, [17]string{""}, Flag_value{}}
 			if compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 2 || compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 3 { //if current node is leaf
@@ -278,7 +248,6 @@ func (mpt *MerklePatriciaTrie) insert_helper(path []uint8, new_value string, cur
 				fmt.Println("is extension")
 				if len(existing_node_path) == 1 {
 					fmt.Println("length is 1")
-					//branch_node.branch_value[existing_node_path[index]] = current_node.hash_node()
 					node_connected_to_extension := mpt.db[current_node.flag_value.value]
 					branch_node.branch_value[existing_node_path[index]] = node_connected_to_extension.hash_node() //HINT.TEST: connect branch connecting to current extension to new branch, before removing extension
 					fmt.Println("current node: ", current_node)
@@ -316,7 +285,6 @@ func (mpt *MerklePatriciaTrie) insert_helper(path []uint8, new_value string, cur
 			current_node.flag_value.encoded_prefix = prefix
 			branch_node := Node{1, [17]string{""}, Flag_value{}}
 			mpt.db[new_node.hash_node()] = new_node
-			//branch_node.branch_value[existing_node_path[index]] = current_node.hash_node()
 			fmt.Println("node prefix: ", compact_decode(new_node.flag_value.encoded_prefix))
 			if isextension && len(compact_decode(new_node.flag_value.encoded_prefix)) == 0 { //HINT.TEST: added for aa,ap,b insert. Ensures we only add new node to branch if it doesn't have empty prefix
 				fmt.Println("ELSE... node is extension with empty prefix")
@@ -363,18 +331,16 @@ func (mpt *MerklePatriciaTrie) Delete(key string) (string, error) {
 	fmt.Println("successfully deleted")
 	fmt.Println("Node returned from delete_helper: ", node)
 	mpt.root = node.hash_node() //?? just added, hope it's fine
-	fmt.Println("CHECK root: ", mpt.root)
-	for key, value := range mpt.db {
-		fmt.Println("key: ", key, "value: ", value)
-	}
+	//fmt.Println("CHECK root: ", mpt.root)
+	//for key, value := range mpt.db {
+	//	fmt.Println("key: ", key, "value: ", value)
+	//}
 	return "", errors.New("")
 }
 
-//find index of branch node
 func find_index_branch(current_node Node) []uint8 {
 	var index_of_branch []uint8
 	fmt.Println(len(current_node.branch_value))
-	//******HINT.SOPE : For loop on top was giving out of range exceptions
 	for i := 0; i < len(current_node.branch_value); i++ {
 		if current_node.branch_value[i] != "" {
 			index_of_branch = append(index_of_branch, uint8(i))
@@ -400,24 +366,21 @@ func (mpt *MerklePatriciaTrie) rebalance_trie(current_node Node, previous_node N
 				fmt.Println("flg: ", next_node.flag_value.value)
 				prefix := append(index_of_branch, compact_decode(next_node.flag_value.encoded_prefix)...)
 				current_node.flag_value.encoded_prefix = compact_encode(append(prefix, 16))
-				//current_node.flag_value.encoded_prefix = compact_encode(append(index_of_branch[0], compact_decode(next_node.flag_value.encoded_prefix)...))
 				current_node.node_type = 2
 				fmt.Println("CURR NODE: ", current_node)
 				current_node.branch_value = [17]string{}
-				//mpt.db[current_node.hash_node()] = current_node
 				return current_node
 			} else if compact_decode_wt_prefix(next_node.flag_value.encoded_prefix)[0] == 1 || compact_decode_wt_prefix(next_node.flag_value.encoded_prefix)[0] == 0 {
 				//if extension den merge current branch with only one element with child extension and to make a new extension
 				fmt.Println("Inside extension merge...")
-				//next_node_extension := compact_decode(next_node.flag_value.encoded_prefix)
 				next_node_extension := compact_decode(next_node.flag_value.encoded_prefix)
 				new_extension_prefix := append(index_of_branch, next_node_extension...)
 				current_node.flag_value.encoded_prefix = compact_encode(new_extension_prefix) //merge 2 extension into one
 				current_node.flag_value.value = next_node.flag_value.value
 				current_node.node_type = 2
 				current_node.branch_value = [17]string{}
-				fmt.Println("new extension: ", current_node)
-				fmt.Println("new extension hash: ", current_node.hash_node())
+				//fmt.Println("new extension: ", current_node)
+				//fmt.Println("new extension hash: ", current_node.hash_node())
 				return current_node
 			}
 		} else if next_node.node_type == 1 {
@@ -447,8 +410,8 @@ func (mpt *MerklePatriciaTrie) rebalance_trie(current_node Node, previous_node N
 			}
 		}
 	}
-	fmt.Println("rebalanced node: ", current_node)
-	fmt.Println("rebalanced node hash: ", current_node.hash_node())
+	//fmt.Println("rebalanced node: ", current_node)
+	//fmt.Println("rebalanced node hash: ", current_node.hash_node())
 	return current_node
 }
 
@@ -466,18 +429,11 @@ func (mpt *MerklePatriciaTrie) delete_helper(path []uint8, current_node Node, pa
 			if len(assigned_branch_indices) == 1 {
 				node := mpt.rebalance_trie(current_node, parent_node)
 				current_node = node
-			} //else{//branch count > 1
-			//mpt.db[current_node.hash_node()] = current_node
-			//}
+			}
 		} else {
 			//decided how to recurse below
 			fmt.Println("entered in branch where path len > 0, node: ", current_node)
 			var node Node
-			//if(compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 1 || compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 2){//if extension, recurse to child
-			//	node = mpt.delete_helper(path[1:], mpt.db[current_node.flag_value.value])
-			//}else if(current_node.node_type == 1){//if branch, get child as zeroth index of path
-			//	node = mpt.delete_helper(path[1:], mpt.db[current_node.branch_value[path[0]]])
-			//}
 			fmt.Println("recurse further from branch, path: ", path[1:])
 			node = mpt.delete_helper(path[1:], mpt.db[current_node.branch_value[path[0]]], previous_node)
 			fmt.Println("entered in branch where path len > 0, result node: ", node)
@@ -552,19 +508,15 @@ func (mpt *MerklePatriciaTrie) delete_helper(path []uint8, current_node Node, pa
 						fmt.Println("Entered two condition -- leaf")
 						decoded_prefix1 := compact_decode(current_node.flag_value.encoded_prefix)
 						decoded_prefix2 := compact_decode(node.flag_value.encoded_prefix)
-						//current_node.flag_value.encoded_prefix = append(decoded_prefix1, decoded_prefix2...)
-						//current_node.flag_value.encoded_prefix = append(current_node.flag_value.encoded_prefix, 16)
-						//current_node.flag_value.value = node.flag_value.value
 						combined_pref := append(decoded_prefix1, decoded_prefix2...)
 						new_node := Node{2, [17]string{}, Flag_value{compact_encode(append(combined_pref, 16)), node.flag_value.value}} //convert to leaf node
 						current_node = new_node
-						//current_node.flag_value.encoded_prefix = compact_encode(append(compact_decode(node.flag_value.encoded_prefix),16))
 					} else if compact_decode_wt_prefix(node.flag_value.encoded_prefix)[0] == 0 || compact_decode_wt_prefix(node.flag_value.encoded_prefix)[0] == 1 {
 						fmt.Println("Entered two condition -- extension")
 						decoded_prefix1 := compact_decode(current_node.flag_value.encoded_prefix)
 						decoded_prefix2 := compact_decode(node.flag_value.encoded_prefix)
 						current_node.flag_value.encoded_prefix = compact_encode(append(decoded_prefix1, decoded_prefix2...))
-						//current_node.flag_value.value = node.flag_value.value		//HINT.TEST: Check if needs to be uncommented
+						current_node.flag_value.value = node.flag_value.value //HINT.TEST: Check if needs to be uncommented
 						//current_node.flag_value.encoded_prefix = compact_encode(compact_decode(node.flag_value.encoded_prefix))
 					}
 				}
@@ -572,16 +524,7 @@ func (mpt *MerklePatriciaTrie) delete_helper(path []uint8, current_node Node, pa
 		}
 	}
 	if previous_node.hash_node() != current_node.hash_node() {
-		fmt.Println("remove node :", previous_node)
-		fmt.Println("hash of remove node :", previous_node.hash_node())
-		if current_node.node_type == 0 {
-			fmt.Println("ZERO NODE TYPE", " Node Hash: ", current_node.hash_node(), "current path: ", path)
-			//remove zeroth node!
-			//delete(mpt.db, current_node.hash_node())
-		}
 		delete(mpt.db, previous_node.hash_node())
-		fmt.Println("add to mpt db, node value: ", current_node)
-		fmt.Println("add to mpt db, node hash: ", current_node.hash_node())
 		if current_node.node_type != 0 {
 			mpt.db[current_node.hash_node()] = current_node
 		}
@@ -622,8 +565,6 @@ func compact_encode(hex_array []uint8) []uint8 {
 // If Leaf, ignore 16 at the end
 func compact_decode(encoded_arr []uint8) []uint8 {
 	result := compact_decode_wt_prefix(encoded_arr)
-	//fmt.Println("result", result)
-	//removed prefix from compact encode below
 	firstNibble := result[0]
 	if firstNibble == 0 || firstNibble == 2 {
 		result = result[2:]
@@ -638,20 +579,6 @@ func compact_decode_wt_prefix(encoded_arr []uint8) []uint8 {
 	for i := 0; i < len(encoded_arr); i += 1 {
 		result = append(result, encoded_arr[i]/16)
 		result = append(result, encoded_arr[i]%16)
-	}
-	return result
-}
-
-//takes input of ascii and gives the prefix
-func get_decode_prefix(ascii_arr []uint8) []uint8 {
-	result := compact_decode_wt_prefix(ascii_arr)
-	firstNibble := result[0]
-	if firstNibble == 0 || firstNibble == 2 {
-		//fmt.Println("Even first nibble")
-		result = result[0:2]
-	} else {
-		//fmt.Println("Odd first nibble")
-		result = result[0:1]
 	}
 	return result
 }
