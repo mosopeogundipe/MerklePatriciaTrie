@@ -204,7 +204,7 @@ func (mpt *MerklePatriciaTrie) insert_helper(path []uint8, new_value string, cur
 			//fmt.Println(new_node)
 			if compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 1 || compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 0 {
 				//if extension node
-				fmt.Println("......inside extension.....")
+				fmt.Println("is extension")
 				ext_node2 := Node{2, [17]string{}, Flag_value{compact_encode(existing_node_path[index+1:]), current_node_value}}
 				branch_node := Node{1, [17]string{""}, Flag_value{}}
 				branch_node.branch_value[16] = new_value
@@ -217,15 +217,13 @@ func (mpt *MerklePatriciaTrie) insert_helper(path []uint8, new_value string, cur
 				current_node = ext_node1
 				return current_node
 			} else {
-				//if leaf
-				fmt.Println("......inside LEAF.....", len(path))
+				fmt.Println("is leaf", len(path))
 				if len(path) == 0 {
 					branch_node.branch_value[16] = new_value //put current value in 16th index
 					mpt.db[new_node.hash_node()] = new_node
 					mpt.db[branch_node.hash_node()] = branch_node
 					delete(mpt.db, current_node.hash_node())
 				} else {
-					//fmt.Println(“hello”)
 					current_node.flag_value.encoded_prefix = compact_encode(path[:index]) //convert to extension node
 					branch_node.branch_value[16] = new_value
 					current_node.flag_value.value = branch_node.hash_node()
@@ -361,7 +359,7 @@ func (mpt *MerklePatriciaTrie) rebalance_trie(current_node Node, previous_node N
 		if next_node.node_type == 2 {
 			fmt.Println("next node is leaf or extension.....")
 			if compact_decode_wt_prefix(next_node.flag_value.encoded_prefix)[0] == 2 || compact_decode_wt_prefix(next_node.flag_value.encoded_prefix)[0] == 3 {
-				// if leaf, pull up leaf value and convert branch to leaf
+				// if next node is leaf, convert current branch node to leaf node containing both branch & leaf values
 				current_node.flag_value.value = next_node.flag_value.value
 				fmt.Println("flg: ", next_node.flag_value.value)
 				prefix := append(index_of_branch, compact_decode(next_node.flag_value.encoded_prefix)...)
@@ -371,7 +369,7 @@ func (mpt *MerklePatriciaTrie) rebalance_trie(current_node Node, previous_node N
 				current_node.branch_value = [17]string{}
 				return current_node
 			} else if compact_decode_wt_prefix(next_node.flag_value.encoded_prefix)[0] == 1 || compact_decode_wt_prefix(next_node.flag_value.encoded_prefix)[0] == 0 {
-				//if extension den merge current branch with only one element with child extension and to make a new extension
+				//if extension, merge current branch with only one element with child extension and to make a new extension
 				fmt.Println("Inside extension merge...")
 				next_node_extension := compact_decode(next_node.flag_value.encoded_prefix)
 				new_extension_prefix := append(index_of_branch, next_node_extension...)
@@ -384,7 +382,7 @@ func (mpt *MerklePatriciaTrie) rebalance_trie(current_node Node, previous_node N
 				return current_node
 			}
 		} else if next_node.node_type == 1 {
-			//if next node is branch node den pull branch up and convert to extension
+			//if next node is branch, merge current branch and next node into one extension
 			fmt.Println("next node is branch")
 			index_of_new_branch := find_index_branch(next_node)
 			if len(index_of_new_branch) == 1 {
@@ -403,9 +401,6 @@ func (mpt *MerklePatriciaTrie) rebalance_trie(current_node Node, previous_node N
 					new_node := Node{2, [17]string{}, Flag_value{compact_encode(index_of_branch), current_node.branch_value[index_of_branch[0]]}} //extension node
 					current_node = new_node
 				}
-				//new_node := Node{2, [17]string{}, Flag_value{compact_encode(index_of_branch), current_node.branch_value[index_of_branch[0]]}} //extension node
-				//current_node = new_node
-				//check if parent is extension, and if so just return
 				//return current_node	//JUST RETURN CURRENT NODE
 			}
 		}
@@ -454,7 +449,6 @@ func (mpt *MerklePatriciaTrie) delete_helper(path []uint8, current_node Node, pa
 				}
 			} else {
 				fmt.Println("Entered ELSE in branch where path len > 0")
-				//set current branch index = nextnode.hashnode
 				current_node.branch_value[path[0]] = node.hash_node()
 			}
 
@@ -476,7 +470,7 @@ func (mpt *MerklePatriciaTrie) delete_helper(path []uint8, current_node Node, pa
 		fmt.Println("index", index, "path length: ", len(path))
 		if index == len(path) && index == len(existing_node_path) && (compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 2 || compact_decode_wt_prefix(current_node.flag_value.encoded_prefix)[0] == 3) { //if paths match fully and node isLeaf
 			fmt.Println("full match deleting")
-			delete(mpt.db, current_node.hash_node()) //?????????????
+			delete(mpt.db, current_node.hash_node())
 			current_node.flag_value.value = ""
 			current_node.flag_value.encoded_prefix = nil
 			current_node.node_type = 0
@@ -517,7 +511,6 @@ func (mpt *MerklePatriciaTrie) delete_helper(path []uint8, current_node Node, pa
 						decoded_prefix2 := compact_decode(node.flag_value.encoded_prefix)
 						current_node.flag_value.encoded_prefix = compact_encode(append(decoded_prefix1, decoded_prefix2...))
 						current_node.flag_value.value = node.flag_value.value //HINT.TEST: Check if needs to be uncommented
-						//current_node.flag_value.encoded_prefix = compact_encode(compact_decode(node.flag_value.encoded_prefix))
 					}
 				}
 			}
